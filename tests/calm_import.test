@@ -1,0 +1,173 @@
+<?php
+/**
+ *  @copyright The Royal National Theatre
+ *  @author John-Paul Drawneek <jdrawneek@nationaltheatre.org.uk>
+ */
+
+require_once dirname(__FILE__) . '/../includes/performances.inc';
+require_once dirname(__FILE__) . '/../includes/names.inc';
+require_once dirname(__FILE__) . '/../includes/roles.inc';
+
+class CalmImportProductionWebTestCase extends DrupalWebTestCase {
+    public static function getInfo() {
+        return array(
+            'name' => 'Calm Production',
+            'description' => 'Test the private methods which parse the xml.',
+            'group' => 'Calm Import',
+        );
+    }
+    
+    public function setUp() {
+        global $user;
+        parent::setUp();
+        drupal_load('module', 'calm_import');
+        module_enable(array('bbpa'));
+        $user->uid  = 1;
+        $user->name = 'admin';
+    }
+    
+    public function testSaveCompany() {
+        $companyName = 'Test Company';
+        $company     = explode(',' ,$companyName);
+        
+        $result = _calm_import_save_company($company);
+        
+        $this->assertTrue(is_numeric($result), 'Invalided NID passed back');
+        $node = node_load($result);
+        $this->assertTrue(is_object($node), 'Node could not be found for returned NID');
+        
+        $this->assertEqual($node->title, $companyName, 'Company name is not correct');
+        
+    }
+    
+    public function testFindCompany() {
+        $companyName = 'Test Company';
+        
+        $result = _calm_import_find_company($companyName);
+        $this->assertTrue(is_numeric($result), 'Invalided NID passed back');
+        $node = node_load($result);
+        $this->assertTrue(is_object($node), 'Node could not be found for returned NID');
+        
+        $this->assertEqual($node->title, $companyName, 'Company name is not correct');
+        
+        $result = _calm_import_find_company($companyName);
+        $this->assertTrue(is_numeric($result), 'Invalided NID passed back');
+        $node2 = node_load($result);
+        $this->assertTrue(is_object($node2), 'Node could not be found for returned NID');
+        
+        $this->assertEqual($node2->title, $companyName, 'Company name is not correct');
+        $this->assertEqual($node->nid, $node2->nid, 'Another Company record has been created');
+        $result = db_query("SELECT nid FROM {node} WHERE type= :type", array(':type'=>'company'));
+        $this->assertFalse($result->rowCount() > 1, 'Double check that there is only one company node failed!');       
+    }
+    
+    public function testSaveTheatre() {
+        $theatreName = 'Test Theatre';
+        $theatre     = explode(',' ,$theatreName);
+        
+        $result = _calm_import_save_theatre($theatre);
+        
+        $this->assertTrue(is_numeric($result), 'Invalided NID passed back');
+        $node = node_load($result);
+        $this->assertTrue(is_object($node), 'Node could not be found for returned NID');
+        
+        $this->assertEqual($node->title, $theatreName, 'Theatre name is not correct');
+        
+    }
+    
+    public function testFindTheatre() {
+        $theatreName = 'Test Theatre';
+        
+        $result = _calm_import_find_theatre($theatreName);
+        $this->assertTrue(is_numeric($result), 'Invalided NID passed back');
+        $testNodeOne = $node = node_load($result);
+        $this->assertTrue(is_object($node), 'Node could not be found for returned NID');
+        
+        $this->assertEqual($node->title, $theatreName, 'Theatre name is not correct');
+        
+        $result = _calm_import_find_theatre($theatreName);
+        $this->assertTrue(is_numeric($result), 'Invalided NID passed back');
+        $node2 = node_load($result);
+        $this->assertTrue(is_object($node2), 'Node could not be found for returned NID');
+        
+        $this->assertEqual($node2->title, $theatreName, 'Theatre name is not correct');
+        $this->assertEqual($node->nid, $node2->nid, 'Another Theatre record has been created');
+        $result = db_query("SELECT nid FROM {node} WHERE type= :type", array(':type'=>'theatre'));
+        $this->assertFalse($result->rowCount() > 1, 'Double check that there is only one theatre node failed!');
+        
+        /**
+         * This is to test adding a theatre with address details 
+         */
+        $theatreData     = 'Test2 Theatre, some location';
+        $theatreName     = 'Test2 Theatre';
+        $theatreLocation = 'some location';
+        
+        $result = _calm_import_find_theatre($theatreData);
+        $this->assertTrue(is_numeric($result), 'Invalided NID passed back');
+        $node = node_load($result);
+        $this->assertTrue(is_object($node), 'Node could not be found for returned NID');
+        
+        $this->assertEqual($node->title, $theatreName, 'Theatre name is not correct');
+        $this->assertEqual($node->bbpa_address[LANGUAGE_NONE][0]['value'], $theatreLocation, 'Theatre address is not correct');
+        
+        $result = _calm_import_find_theatre($theatreData);
+        $this->assertTrue(is_numeric($result), 'Invalided NID passed back');
+        $node2 = node_load($result);
+        $this->assertTrue(is_object($node2), 'Node could not be found for returned NID');
+        
+        $this->assertEqual($node2->title, $theatreName, 'Theatre name is not correct');
+        $this->assertEqual($node->nid, $node2->nid, 'Another Theatre record has been created');
+        $result = db_query("SELECT nid FROM {node} WHERE type= :type", array(':type'=>'theatre'));
+        $this->assertFalse($result->rowCount() > 2, 'Double check that there is only one theatre node failed!');
+        /**
+         * This is to test that having a location does not add a new Theatre 
+         */
+        $theatreData     = 'Test Theatre, some location';
+        $theatreName     = 'Test Theatre';
+        $theatreLocation = 'some location';
+        
+        $result = _calm_import_find_theatre($theatreData);
+        $this->assertTrue(is_numeric($result), 'Invalided NID passed back');
+        $node = node_load($result);
+        $this->assertTrue(is_object($node), 'Node could not be found for returned NID');
+        $this->assertEqual($node->nid, $testNodeOne->nid, 'Another Theatre record has been created');
+        $result = db_query("SELECT nid FROM {node} WHERE type= :type", array(':type'=>'theatre'));
+        $this->assertFalse($result->rowCount() > 2, 'Double check that there is only one theatre node failed!');
+    }
+    
+    public function testSavePerformance() {
+        
+        $counter = 0;
+        $updated = 0;
+        $prev = libxml_use_internal_errors(TRUE);
+        $dom = new DOMDocument();
+        $dom->load(dirname(__FILE__) . '/20120206.xml');
+        $list = $dom->getElementsByTagName('DScribeRecord');
+        foreach($list AS $i=>$v) {
+            _calm_import_save_performance($v, $counter, $updated);
+        }
+        $errors = libxml_get_errors();
+        libxml_use_internal_errors($prev);
+        
+        $this->assertEqual($counter, 10, 'There should be ten performances created.');
+        $this->assertEqual($updated, 0, 'There should be Zero performances updated.');
+        $result = db_query("SELECT nid FROM {node} WHERE type= :type", array(':type'=>'production'));
+        $this->assertFalse($result->rowCount() > 10, 'There is more that 10 production added');
+        $this->assertFalse($result->rowCount() < 10, 'There is less that 10 production added');
+        
+        $counter = 0;
+        $updated = 0;
+        $list = $dom->getElementsByTagName('DScribeRecord');
+        foreach($list AS $i=>$v) {
+            _calm_import_save_performance($v, $counter, $updated);
+        }
+        $result = db_query("SELECT nid FROM {node} WHERE type= :type", array(':type'=>'production'));
+        $this->assertFalse($result->rowCount() > 10, 'There is more that 10 production added');
+        $this->assertFalse($result->rowCount() < 10, 'There is less that 10 production added');
+        $this->assertEqual($counter, 0, 'There should be Zero performances created.');
+        $this->assertEqual($updated, 10, 'There should be Ten performances updated.');
+    }
+    
+}
+
+?>

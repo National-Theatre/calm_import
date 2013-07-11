@@ -1,0 +1,12 @@
+name = Calm DB Import
+description = Module for importing in Calm XML data
+core = 7.x
+package = bbpa
+php = 5.2
+version = 0.1-dev
+dependencies[] = bbpa
+dependencies[] = field_collection
+files[] = tests/calm_import.test
+; files[] = includes/performances.inc
+; configure =
+datestamp = "1328533275"

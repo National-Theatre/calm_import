@@ -1,0 +1,175 @@
+<?php
+/**
+ * @file
+ * @copyright National Theatre
+ * @author John-Paul Drawneek
+ */
+
+/**
+ * Implements hook_menu().
+ */
+function calm_import_menu() {
+  return array(
+    'admin/config/calm-import' => array(
+      'title' => 'Calm XML Imports',
+      'description' => 'General system related configuration.',
+      'page callback' => 'system_admin_menu_block_page',
+      'access arguments' => array('calm administration pages'),
+      'file' => '/system.admin.inc',
+      'file path' => drupal_get_path('module', 'system'),
+    ),
+    'admin/config/calm-import/performance' => array(
+      'title' => 'Performances',
+      'description' => 'Calm XML import for performances records.',
+      'page callback' => 'drupal_get_form',
+      'page arguments' => array('calm_import_performance'),
+      'access arguments' => array('calm administration pages'),
+      'file' => 'includes/performances.inc',
+    ),
+    'admin/config/calm-import/names' => array(
+      'title' => 'Names',
+      'description' => 'Calm XML import for names records.',
+      'page callback' => 'drupal_get_form',
+      'page arguments' => array('calm_import_names'),
+      'access arguments' => array('calm administration pages'),
+      'file' => 'includes/names.inc',
+    ),
+    'admin/config/calm-import/roles' => array(
+      'title' => 'Roles',
+      'description' => 'Calm XML import for roles records.',
+      'page callback' => 'drupal_get_form',
+      'page arguments' => array('calm_import_roles'),
+      'access arguments' => array('calm administration pages'),
+      'file' => 'includes/roles.inc',
+    ),
+    'admin/config/calm-import/roles' => array(
+      'title' => 'Roles',
+      'description' => 'Calm XML import for roles records.',
+      'page callback' => 'drupal_get_form',
+      'page arguments' => array('calm_import_roles'),
+      'access arguments' => array('calm administration pages'),
+      'file' => 'includes/roles.inc',
+    ),
+    'admin/config/calm-import/catalog' => array(
+      'title' => 'Catalog',
+      'description' => 'Calm XML import for catalog records.',
+      'page callback' => 'drupal_get_form',
+      'page arguments' => array('calm_import_catalog'),
+      'access arguments' => array('calm administration pages'),
+      'file' => 'includes/catalog.inc',
+    ),
+  );
+}
+/**
+ * Implements hook_permission().
+ */
+function calm_import_permission() {
+  return array(
+    'calm administration pages' => array(
+      'title' => t('Calm Importer'),
+      'description' => t('Allow user to use the calm importer to upload xml data,'),
+    ),
+  );
+}
+/**
+ * Implements hook_theme().
+ */
+function calm_import_theme($existing, $type, $theme, $path) {
+  return array();
+}
+
+/**
+ * Generic form validation for all importers.
+ * @access private
+ *
+ * @param array $form
+ *   Form structure
+ * @param array $form_state
+ *   Current structure and data of form
+ * @param string $type
+ *   Type of xml file to look for
+ */
+function _calm_import_form_validate($form, &$form_state, $type) {
+
+  $validators = array('file_validate_extensions' => array('xml'));
+
+  if (defined('TESTING') && function_exists('file_save_upload_hack')) {
+    print "testing mode\n\n";
+    $file = file_save_upload_hack('xml', $validators, "temporary://");
+  }
+  else {
+    $file = file_save_upload('xml', $validators, "temporary://");
+  }
+  if ($file) {
+    $prev = libxml_use_internal_errors(TRUE);
+    $result = simplexml_load_file(drupal_realpath($file->uri));
+    if ($result === FALSE) {
+      watchdog('CALM Import', '<pre>' . print_r(libxml_get_errors(), TRUE) . '</pre>');
+      form_set_error('xml', 'File uploaded does not contain valid xml.');
+      file_delete($file);
+    }
+    else {
+      $attri = $result->attributes();
+      if (isset($attri['Name']) && $attri['Name'] == $type) {
+        $form_state['uploaded_file'] = $file;
+      }
+      else {
+        form_set_error(
+          'xml',
+          'File uploaded does not contain xml for ' . check_plain($type) . '.'
+        );
+      }
+    }
+    libxml_use_internal_errors($prev);
+  }
+  else {
+    form_set_error('xml', 'Not an xml file uploaded.');
+  }
+}
+
+/**
+ * Generic form Process for all Importers.
+ * @access private
+ *
+ * @param array $form
+ *   Form structure
+ * @param array $form_state
+ *   Current form data and structure
+ * @param string $importer
+ *   import function to call
+ * @param string $type
+ *   Type to be displayed in a message
+ */
+function _calm_import_form_submit($form, &$form_state, $importer, $type) {
+  $file = $form_state['uploaded_file'];
+  if (!file_exists(drupal_realpath('public://calmXml/'))) {
+    drupal_mkdir('public://calmXml/');
+  }
+  $move_result = file_move($file, 'public://calmXml/' . $file->filename);
+  $counter = 0;
+  $updated = 0;
+  if ($move_result === FALSE) {
+    drupal_set_message('Failed to move xml uploaded to working directory', 'error');
+  }
+  else {
+    set_time_limit(0);
+    $prev = libxml_use_internal_errors(TRUE);
+    $dom = new DOMDocument();
+    $dom->load(drupal_realpath($move_result->uri));
+    $list = $dom->getElementsByTagName('DScribeRecord');
+    foreach ($list as $i => $v) {
+      $importer($v, $counter, $updated);
+    }
+    $errors = libxml_get_errors();
+    if (!empty($errors)) {
+      watchdog('CALM Import', '<pre>' . print_r($errors, TRUE) . '</pre>');
+    }
+    libxml_use_internal_errors($prev);
+  }
+  if ($counter > 0) {
+    drupal_set_message('Added: ' . $counter . ' ' . check_plain($type));
+  }
+  if ($updated > 0) {
+    drupal_set_message('Updated: ' . $updated . ' ' . check_plain($type));
+  }
+}
