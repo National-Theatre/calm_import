@@ -263,11 +263,11 @@ function _calm_import_save_cache_performance(DOMElement $v, &$counter, &$updated
     db_merge('calm_cache_performance_roles')
             ->key(array(
               'PerformanceID' => $v->getElementsByTagName('RecordID')->item(0)->nodeValue,
-              'RoleCode' => $role->nodeValue,
+              'RoleCode' => trim($role->nodeValue),
             ))
             ->insertFields(array(
               'PerformanceID' => $v->getElementsByTagName('RecordID')->item(0)->nodeValue,
-              'RoleCode' => $role->nodeValue,
+              'RoleCode' => trim($role->nodeValue),
               'created' => time(),
               'changed' => time(),
             ))
@@ -281,11 +281,11 @@ function _calm_import_save_cache_performance(DOMElement $v, &$counter, &$updated
     db_merge('calm_cache_performance_creatives')
             ->key(array(
               'PerformanceID' => $v->getElementsByTagName('RecordID')->item(0)->nodeValue,
-              'RoleCode' => $role->nodeValue,
+              'RoleCode' => trim($role->nodeValue),
             ))
             ->insertFields(array(
               'PerformanceID' => $v->getElementsByTagName('RecordID')->item(0)->nodeValue,
-              'RoleCode' => $role->nodeValue,
+              'RoleCode' => trim($role->nodeValue),
               'created' => time(),
               'changed' => time(),
             ))
